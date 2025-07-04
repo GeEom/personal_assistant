@@ -1,7 +1,8 @@
-use gloo::utils::{window, document};
+use gloo::utils::window;
 use serde::{Deserialize, Serialize};
 use web_sys::UrlSearchParams;
 use uuid::Uuid;
+use wasm_bindgen::JsValue;
 
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const CLIENT_ID: &str = "126932716262-m3jg96nhn9efg7mkee5k9d9aqnu0282l.apps.googleusercontent.com";
@@ -97,9 +98,7 @@ pub fn initiate_oauth_flow() {
     
     let auth_url = format!("{}?{}", GOOGLE_AUTH_URL, query_string);
     
-    if let Some(location) = window().location().href().ok() {
-        window().location().set_href(&auth_url).unwrap();
-    }
+    window().location().set_href(&auth_url).unwrap();
 }
 
 pub fn parse_oauth_callback() -> Option<(String, String)> {
@@ -119,11 +118,10 @@ pub fn parse_oauth_callback() -> Option<(String, String)> {
 }
 
 pub fn clear_url_params() {
-    if let Ok(location) = window().location() {
-        if let Ok(Some(path)) = location.pathname() {
-            let _ = window().history().unwrap()
-                .replace_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(&path));
-        }
+    let location = window().location();
+    if let Ok(path) = location.pathname() {
+        let _ = window().history().unwrap()
+            .replace_state_with_url(&JsValue::NULL, "", Some(&path));
     }
 }
 

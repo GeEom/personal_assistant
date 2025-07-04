@@ -2,6 +2,7 @@ use gloo_net::http::Request;
 use serde::{Deserialize, Serialize};
 use yew::prelude::*;
 use gloo_console as console;
+use wasm_bindgen::JsCast;
 
 mod auth;
 use auth::{
@@ -146,8 +147,12 @@ fn app() -> Html {
                 
                 if let Some(user) = user {
                     let target = e.target_dyn_into::<web_sys::HtmlFormElement>().unwrap();
-                    let form_data = web_sys::FormData::new_with_form(&target).unwrap();
-                    let content = form_data.get("content").as_string().unwrap_or_default();
+                    let content = target.elements()
+                        .named_item("content")
+                        .unwrap()
+                        .dyn_into::<web_sys::HtmlInputElement>()
+                        .unwrap()
+                        .value();
                     
                     if !content.is_empty() {
                         let message = Message {
