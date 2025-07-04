@@ -1,8 +1,8 @@
 use gloo::utils::window;
 use serde::{Deserialize, Serialize};
-use web_sys::UrlSearchParams;
 use uuid::Uuid;
 use wasm_bindgen::JsValue;
+use web_sys::UrlSearchParams;
 
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const CLIENT_ID: &str = "126932716262-m3jg96nhn9efg7mkee5k9d9aqnu0282l.apps.googleusercontent.com";
@@ -43,7 +43,7 @@ pub struct AuthState {
 }
 
 impl AuthState {
-    pub fn is_authenticated(&self) -> bool {
+    pub const fn is_authenticated(&self) -> bool {
         self.token.is_some()
     }
 }
@@ -53,10 +53,8 @@ pub fn generate_state() -> String {
 }
 
 pub fn save_state(state: &str) {
-    if let Ok(storage) = window().local_storage() {
-        if let Some(storage) = storage {
-            let _ = storage.set_item("oauth_state", state);
-        }
+    if let Ok(Some(storage)) = window().local_storage() {
+        let _ = storage.set_item("oauth_state", state);
     }
 }
 
@@ -70,17 +68,15 @@ pub fn get_saved_state() -> Option<String> {
 }
 
 pub fn clear_saved_state() {
-    if let Ok(storage) = window().local_storage() {
-        if let Some(storage) = storage {
-            let _ = storage.remove_item("oauth_state");
-        }
+    if let Ok(Some(storage)) = window().local_storage() {
+        let _ = storage.remove_item("oauth_state");
     }
 }
 
 pub fn initiate_oauth_flow() {
     let state = generate_state();
     save_state(&state);
-    
+
     let params = [
         ("client_id", CLIENT_ID),
         ("redirect_uri", REDIRECT_URI),
@@ -89,60 +85,62 @@ pub fn initiate_oauth_flow() {
         ("state", &state),
         ("access_type", "online"),
     ];
-    
+
     let query_string = params
         .iter()
         .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
         .collect::<Vec<_>>()
         .join("&");
-    
-    let auth_url = format!("{}?{}", GOOGLE_AUTH_URL, query_string);
-    
+
+    let auth_url = format!("{GOOGLE_AUTH_URL}?{query_string}");
+
     window().location().set_href(&auth_url).unwrap();
 }
 
 pub fn parse_oauth_callback() -> Option<(String, String)> {
     let location = window().location();
     let search = location.search().ok()?;
-    
+
     if search.is_empty() {
         return None;
     }
-    
+
     let params = UrlSearchParams::new_with_str(&search).ok()?;
-    
+
     let code = params.get("code")?;
     let state = params.get("state")?;
-    
+
     Some((code, state))
 }
 
 pub fn clear_url_params() {
     let location = window().location();
     if let Ok(path) = location.pathname() {
-        let _ = window().history().unwrap()
+        let _ = window()
+            .history()
+            .unwrap()
             .replace_state_with_url(&JsValue::NULL, "", Some(&path));
     }
 }
 
 pub async fn exchange_code_for_token(code: String) -> Result<AuthResponse, String> {
     let request_body = AuthRequest { code };
-    
-    let response = gloo_net::http::Request::post(&format!("{}/auth/google", BACKEND_URL))
+
+    let response = gloo_net::http::Request::post(&format!("{BACKEND_URL}/auth/google"))
         .json(&request_body)
-        .map_err(|e| format!("Failed to create request: {}", e))?
+        .map_err(|e| format!("Failed to create request: {e}"))?
         .send()
         .await
-        .map_err(|e| format!("Failed to send request: {}", e))?;
-    
+        .map_err(|e| format!("Failed to send request: {e}"))?;
+
     if !response.ok() {
         return Err(format!("Authentication failed: {}", response.status()));
     }
-    
+
     response
         .json::<AuthResponse>()
         .await
-        .map_err(|e| format!("Failed to parse response: {}", e))
+        .map_err(|e| format!("Failed to parse response: {e}"))
 }
 
 mod urlencoding {
@@ -158,3 +156,4 @@ mod urlencoding {
             .collect()
     }
 }
+

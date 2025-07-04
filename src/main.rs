@@ -1,14 +1,13 @@
+use gloo_console as console;
 use gloo_net::http::Request;
 use serde::{Deserialize, Serialize};
-use yew::prelude::*;
-use gloo_console as console;
 use wasm_bindgen::JsCast;
+use yew::prelude::*;
 
 mod auth;
 use auth::{
-    AuthState, initiate_oauth_flow, parse_oauth_callback, 
-    exchange_code_for_token, get_saved_state, clear_saved_state, clear_url_params,
-    BACKEND_URL
+    AuthState, BACKEND_URL, clear_saved_state, clear_url_params, exchange_code_for_token,
+    get_saved_state, initiate_oauth_flow, parse_oauth_callback,
 };
 
 #[derive(Deserialize, Serialize, Clone, PartialEq)]
@@ -39,18 +38,18 @@ fn app() -> Html {
     {
         let auth_state = auth_state.clone();
         let app_state = app_state.clone();
-        
-        use_effect_with((), move |_| {
+
+        use_effect_with((), move |()| {
             if let Some((code, state)) = parse_oauth_callback() {
                 // Verify state matches
                 if let Some(saved_state) = get_saved_state() {
                     if saved_state == state {
                         clear_saved_state();
                         clear_url_params();
-                        
+
                         wasm_bindgen_futures::spawn_local(async move {
                             app_state.set(AppState::Loading);
-                            
+
                             match exchange_code_for_token(code).await {
                                 Ok(auth_response) => {
                                     auth_state.set(AuthState {
@@ -60,7 +59,7 @@ fn app() -> Html {
                                     app_state.set(AppState::Authenticated);
                                 }
                                 Err(e) => {
-                                    console::error!(&format!("Auth error: {}", e));
+                                    console::error!(&format!("Auth error: {e}"));
                                     app_state.set(AppState::Error(e));
                                 }
                             }
@@ -89,14 +88,14 @@ fn app() -> Html {
         let messages = messages.clone();
         let auth_state = auth_state.clone();
         let app_state_val = (*app_state).clone();
-        
+
         use_effect_with(app_state_val, move |state| {
             if matches!(state, AppState::Authenticated) {
                 if let Some(token) = &auth_state.token {
                     let token = token.clone();
                     wasm_bindgen_futures::spawn_local(async move {
-                        match Request::get(&format!("{}/messages", BACKEND_URL))
-                            .header("Authorization", &format!("Bearer {}", token))
+                        match Request::get(&format!("{BACKEND_URL}/messages"))
+                            .header("Authorization", &format!("Bearer {token}"))
                             .send()
                             .await
                         {
@@ -106,7 +105,7 @@ fn app() -> Html {
                                 }
                             }
                             Err(e) => {
-                                console::error!(&format!("Failed to fetch messages: {}", e));
+                                console::error!(&format!("Failed to fetch messages: {e}"));
                             }
                         }
                     });
@@ -125,7 +124,7 @@ fn app() -> Html {
         let auth_state = auth_state.clone();
         let app_state = app_state.clone();
         let messages = messages.clone();
-        
+
         Callback::from(move |_| {
             auth_state.set(AuthState::default());
             app_state.set(AppState::Unauthenticated);
@@ -136,24 +135,25 @@ fn app() -> Html {
     let on_send_message = {
         let auth_state = auth_state.clone();
         let messages = messages.clone();
-        
+
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
-            
+
             if let Some(token) = &auth_state.token {
                 let token = token.clone();
                 let messages = messages.clone();
                 let user = auth_state.user.clone();
-                
+
                 if let Some(user) = user {
                     let target = e.target_dyn_into::<web_sys::HtmlFormElement>().unwrap();
-                    let content = target.elements()
+                    let content = target
+                        .elements()
                         .named_item("content")
                         .unwrap()
                         .dyn_into::<web_sys::HtmlInputElement>()
                         .unwrap()
                         .value();
-                    
+
                     if !content.is_empty() {
                         let message = Message {
                             id: None,
@@ -162,10 +162,10 @@ fn app() -> Html {
                             created_at: None,
                             user_id: Some(user.id),
                         };
-                        
+
                         wasm_bindgen_futures::spawn_local(async move {
-                            match Request::post(&format!("{}/messages", BACKEND_URL))
-                                .header("Authorization", &format!("Bearer {}", token))
+                            match Request::post(&format!("{BACKEND_URL}/messages"))
+                                .header("Authorization", &format!("Bearer {token}"))
                                 .json(&message)
                                 .unwrap()
                                 .send()
@@ -179,11 +179,11 @@ fn app() -> Html {
                                     }
                                 }
                                 Err(e) => {
-                                    console::error!(&format!("Failed to send message: {}", e));
+                                    console::error!(&format!("Failed to send message: {e}"));
                                 }
                             }
                         });
-                        
+
                         target.reset();
                     }
                 }
@@ -194,7 +194,7 @@ fn app() -> Html {
     html! {
         <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
             <h1>{"Personal Assistant"}</h1>
-            
+
             {match &*app_state {
                 AppState::CheckingAuth => html! {
                     <div style="text-align: center; padding: 40px;">
@@ -210,7 +210,7 @@ fn app() -> Html {
                     <div style="text-align: center; padding: 40px;">
                         <h2>{"Welcome!"}</h2>
                         <p>{"Please sign in with your Google account to continue."}</p>
-                        <button 
+                        <button
                             onclick={on_login}
                             style="background: #4285f4; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 20px;"
                         >
@@ -221,7 +221,7 @@ fn app() -> Html {
                 AppState::Error(error) => html! {
                     <div style="text-align: center; padding: 40px;">
                         <p style="color: red;">{format!("❌ Error: {}", error)}</p>
-                        <button 
+                        <button
                             onclick={on_login}
                             style="background: #4285f4; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 20px;"
                         >
@@ -237,7 +237,7 @@ fn app() -> Html {
                                     <div>
                                         <strong>{"Signed in as: "}</strong>{&user.email}
                                     </div>
-                                    <button 
+                                    <button
                                         onclick={on_logout}
                                         style="background: #dc3545; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer;"
                                     >
@@ -248,10 +248,10 @@ fn app() -> Html {
                         } else {
                             html! {}
                         }}
-                        
+
                         <div style="margin-bottom: 20px;">
                             <h2>{"Messages"}</h2>
-                            
+
                             <form onsubmit={on_send_message} style="margin-bottom: 20px;">
                                 <div style="display: flex; gap: 10px;">
                                     <input
@@ -269,7 +269,7 @@ fn app() -> Html {
                                     </button>
                                 </div>
                             </form>
-                            
+
                             <div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; min-height: 300px; max-height: 500px; overflow-y: auto;">
                                 {if messages.is_empty() {
                                     html! {
@@ -307,3 +307,4 @@ fn main() {
     yew::Renderer::<App>::with_root(gloo::utils::document().get_element_by_id("app").unwrap())
         .render();
 }
+

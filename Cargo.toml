@@ -2,6 +2,9 @@
 name = "mobile_frontend"
 version = "0.1.0"
 edition = "2024"
+description = "Frontend WASM application for Personal Assistant"
+license = "MIT"
+repository = "https://github.com/GeEom/personal_assistant"
 
 [dependencies]
 yew = { version = "0.21", features = ["csr"] }
